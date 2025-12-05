@@ -9,6 +9,7 @@
     "build:functions": "tsc --project tsconfig.functions.json",
     "copy:assets": "mkdir -p dist/public && cp -r public/* dist/public/ 2>/dev/null || true && cp tgbot.mp4 dist/ 2>/dev/null || true",
     "start": "node dist/server.js",
+    "postinstall": "npm run build",
     "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
     "type-check": "tsc --noEmit",
     "setup-webhook": "node dist/scripts/setup-webhook.js"
