@@ -1,7 +1,7 @@
-import { Handler } from '@netlify/functions';
+import { Handler, HandlerEvent, HandlerContext } from '@netlify/functions';
 import { bot } from '../../dist/bot/bot';
 
-export const handler: Handler = async (event, context) => {
+export const handler: Handler = async (event: HandlerEvent, context: HandlerContext) => {
   // Only allow POST requests
   if (event.httpMethod !== 'POST') {
     return {

@@ -2,14 +2,14 @@ import TelegramBot from 'node-telegram-bot-api';
 import { config } from '../config';
 
 const token = config.telegramBotToken;
-const webhookUrl = process.argv[2] || process.env.WEBHOOK_URL;
+const webhookUrl = process.argv[2] || process.env.WEBHOOK_URL || '';
 
 if (!token) {
   console.error('Error: TELEGRAM_BOT_TOKEN is not set');
   process.exit(1);
 }
 
-if (!webhookUrl) {
+if (!webhookUrl || webhookUrl.trim() === '') {
   console.error('Error: Webhook URL is required');
   console.log('Usage: npm run setup-webhook <webhook-url>');
   console.log('Example: npm run setup-webhook https://your-site.netlify.app/.netlify/functions/webhook');

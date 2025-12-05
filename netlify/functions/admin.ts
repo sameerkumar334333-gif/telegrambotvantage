@@ -1,4 +1,4 @@
-import { Handler } from '@netlify/functions';
+import { Handler, HandlerEvent, HandlerContext } from '@netlify/functions';
 import { checkCredentials } from '../../dist/middleware/auth';
 import { config } from '../../dist/config';
 
@@ -12,7 +12,7 @@ function getSessionId(cookies: string): string | null {
   return match ? match[1] : null;
 }
 
-export const handler: Handler = async (event, context) => {
+export const handler: Handler = async (event: HandlerEvent, context: HandlerContext) => {
   const path = event.path.replace('/.netlify/functions/admin', '') || '/';
   const method = event.httpMethod;
   const cookies = event.headers.cookie || '';
@@ -37,12 +37,14 @@ export const handler: Handler = async (event, context) => {
         const newSessionId = `${Date.now()}-${Math.random()}`;
         sessions.set(newSessionId, { authenticated: true });
         
+        const headers: { [key: string]: string } = {
+          'Content-Type': 'application/json',
+          'Set-Cookie': `admin.sid=${newSessionId}; HttpOnly; Path=/; SameSite=Lax; Max-Age=86400`,
+        };
+        
         return {
           statusCode: 200,
-          headers: {
-            'Content-Type': 'application/json',
-            'Set-Cookie': `admin.sid=${newSessionId}; HttpOnly; Path=/; SameSite=Lax; Max-Age=86400`,
-          },
+          headers,
           body: JSON.stringify({ success: true }),
         };
       } else {
@@ -66,12 +68,13 @@ export const handler: Handler = async (event, context) => {
     if (sessionId) {
       sessions.delete(sessionId);
     }
+    const headers: { [key: string]: string } = {
+      'Content-Type': 'application/json',
+      'Set-Cookie': 'admin.sid=; HttpOnly; Path=/; Max-Age=0',
+    };
     return {
       statusCode: 200,
-      headers: {
-        'Content-Type': 'application/json',
-        'Set-Cookie': 'admin.sid=; HttpOnly; Path=/; Max-Age=0',
-      },
+      headers,
       body: JSON.stringify({ success: true }),
     };
   }

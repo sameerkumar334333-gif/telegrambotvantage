@@ -1,4 +1,4 @@
-import { Handler } from '@netlify/functions';
+import { Handler, HandlerEvent, HandlerContext } from '@netlify/functions';
 import { supabase } from '../../dist/services/supabase';
 import { sendVerificationMessage, sendRejectionMessage, sendCustomMessage } from '../../dist/services/bot-messaging';
 import { UpdateSubmissionRequest } from '../../dist/types';
@@ -19,7 +19,7 @@ function isAuthenticated(cookies: string): boolean {
   return session?.authenticated || false;
 }
 
-export const handler: Handler = async (event, context) => {
+export const handler: Handler = async (event: HandlerEvent, context: HandlerContext) => {
   // Check authentication
   if (!isAuthenticated(event.headers.cookie || '')) {
     return {
