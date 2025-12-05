@@ -9,7 +9,7 @@ import './bot/bot'; // Initialize bot
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 10000;
 const SESSION_SECRET = process.env.SESSION_SECRET || 'change-this-secret-in-production';
 
 // Middleware
@@ -49,4 +49,3 @@ app.listen(PORT, () => {
   console.log(`Server is running on http://localhost:${PORT}`);
   console.log(`Admin panel: http://localhost:${PORT}/admin`);
 });
-
