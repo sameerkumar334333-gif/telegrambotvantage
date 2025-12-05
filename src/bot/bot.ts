@@ -1,13 +1,17 @@
 import TelegramBot from 'node-telegram-bot-api';
 import path from 'path';
+import fs from 'fs';
 import { config } from '../config';
 import { supabase } from '../services/supabase';
 import { uploadImageToSupabase } from '../services/storage';
 import { getUserState, setUserState, clearUserState } from '../services/user-state';
 
 const token = config.telegramBotToken;
-// Video path - works in both local and Netlify environments
-const WELCOME_VIDEO_PATH = path.join(process.cwd(), 'tgbot.mp4');
+// Video path - works in both local, Render, and Netlify environments
+// Try dist folder first (production build), then root (development)
+const distVideoPath = path.join(process.cwd(), 'dist', 'tgbot.mp4');
+const rootVideoPath = path.join(process.cwd(), 'tgbot.mp4');
+const WELCOME_VIDEO_PATH = fs.existsSync(distVideoPath) ? distVideoPath : rootVideoPath;
 const VANTAGE_LINK = 'https://vigco.co/la-com/m8fVIcJJ';
 
 if (!token) {
@@ -53,15 +57,16 @@ To get VIP access to the Wolf of Forex VIP Community, please follow these instru
 Let's get started! Drop your UID below 👇`;
 
   try {
-    // Send video file with welcome message
-    await bot.sendVideo(chatId, WELCOME_VIDEO_PATH, {
+    // Try dist folder first (production), then root (development)
+    const videoPath = WELCOME_VIDEO_PATH;
+    await bot.sendVideo(chatId, videoPath, {
       caption: welcomeMessage,
     });
 
     // Set user state to waiting for UID
     setUserState(user.id, { step: 'waiting_for_uid' });
   } catch (error) {
-    console.error('Error sending welcome message:', error);
+    console.error('Error sending welcome video:', error);
     // Fallback to text only
     await bot.sendMessage(chatId, welcomeMessage);
     setUserState(user.id, { step: 'waiting_for_uid' });
