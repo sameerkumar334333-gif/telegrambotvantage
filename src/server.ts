@@ -36,7 +36,10 @@ app.use(
 app.use(express.static(path.join(__dirname, '../public')));
 
 // Routes
-app.use('/admin', adminRoutes);
+
+app.get('/', (req, res) => {
+  res.send('Service is up and running.');
+});app.use('/admin', adminRoutes);
 app.use('/api', apiRoutes);
 
 // Health check endpoint
