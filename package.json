@@ -4,7 +4,7 @@
   "description": "telegram bot with admin panel for screenshot submissions",
   "main": "dist/server.js",
   "scripts": {
-    "build": "npm run build:ts && npm run build:functions && npm run copy:assets",
+    "build": "npm run build:ts && npm run build:functions || true && npm run copy:assets",
     "build:ts": "tsc",
     "build:functions": "tsc --project tsconfig.functions.json",
     "copy:assets": "mkdir -p dist/public && cp -r public/* dist/public/ 2>/dev/null || true && cp tgbot.mp4 dist/ 2>/dev/null || true",

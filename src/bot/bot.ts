@@ -18,8 +18,8 @@ if (!token) {
   throw new Error('TELEGRAM_BOT_TOKEN is not set in environment variables');
 }
 
-// Use webhook mode for Netlify, polling for local development
-const useWebhook = process.env.NETLIFY === 'true' || process.env.USE_WEBHOOK === 'true';
+// Use webhook mode for Netlify/Render, polling for local development
+const useWebhook = process.env.NETLIFY === 'true' || process.env.USE_WEBHOOK === 'true' || process.env.RENDER === 'true';
 export const bot = new TelegramBot(token, { 
   polling: !useWebhook 
 });
