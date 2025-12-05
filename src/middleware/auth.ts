@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs';
 import { config } from '../config';
 
 const ADMIN_USERNAME = config.adminUsername;
@@ -44,4 +44,3 @@ export async function checkCredentials(username: string, password: string): Prom
   const hash = await getHashedPassword();
   return await bcrypt.compare(password, hash);
 }
-
