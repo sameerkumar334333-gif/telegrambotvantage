@@ -28,8 +28,43 @@
     <div id="admin-container" class="container hidden">
         <header>
             <h1>Screenshot Submissions</h1>
-            <button id="logout-btn" class="btn btn-secondary">Logout</button>
+            <div class="header-buttons">
+                <button id="view-messages-btn" class="btn btn-primary">💬 View Messages</button>
+                <button id="logout-btn" class="btn btn-secondary">Logout</button>
+            </div>
         </header>
+
+        <!-- Statistics Dashboard -->
+        <div class="stats-dashboard">
+            <div class="stat-card">
+                <div class="stat-icon">📤</div>
+                <div class="stat-content">
+                    <div class="stat-value" id="total-sent">0</div>
+                    <div class="stat-label">Messages Sent</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">📥</div>
+                <div class="stat-content">
+                    <div class="stat-value" id="total-received">0</div>
+                    <div class="stat-label">Messages Received</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">👥</div>
+                <div class="stat-content">
+                    <div class="stat-value" id="unique-users">0</div>
+                    <div class="stat-label">Unique Users Messaged</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">💬</div>
+                <div class="stat-content">
+                    <div class="stat-value" id="total-messages">0</div>
+                    <div class="stat-label">Total Messages</div>
+                </div>
+            </div>
+        </div>
 
         <div class="controls">
             <div class="filter-group">
@@ -94,6 +129,48 @@
         </div>
 
         <div id="no-submissions" class="no-data hidden">No submissions found.</div>
+    </div>
+
+    <!-- Messages/Chat Modal -->
+    <div id="messages-modal" class="modal hidden">
+        <div class="modal-content messages-modal-content">
+            <div class="modal-header">
+                <h2>💬 Bot Messages & Chat History</h2>
+                <button class="modal-close" id="close-messages-modal">&times;</button>
+            </div>
+            <div class="messages-modal-body">
+                <div class="messages-sidebar">
+                    <div class="messages-search">
+                        <input type="text" id="messages-search-input" placeholder="Search users...">
+                    </div>
+                    <div id="users-list" class="users-list">
+                        <!-- Users will be loaded here -->
+                    </div>
+                </div>
+                <div class="messages-chat">
+                    <div id="chat-header" class="chat-header">
+                        <div class="chat-user-info">
+                            <h3 id="chat-user-name">Select a user to view chat</h3>
+                            <span id="chat-user-id"></span>
+                        </div>
+                    </div>
+                    <div id="chat-messages" class="chat-messages">
+                        <div class="chat-placeholder">
+                            <p>Select a user from the sidebar to view chat history</p>
+                        </div>
+                    </div>
+                    <div id="chat-input-container" class="chat-input-container hidden">
+                        <div class="chat-input-wrapper">
+                            <textarea id="chat-message-input" class="chat-message-input" placeholder="Type a message..." rows="1"></textarea>
+                            <button id="chat-send-btn" class="chat-send-btn" title="Send message">
+                                <span>📤</span>
+                            </button>
+                        </div>
+                        <div id="chat-input-error" class="chat-input-error"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script src="admin.js"></script>

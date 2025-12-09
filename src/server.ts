@@ -2,6 +2,7 @@ import express from 'express';
 import session from 'express-session';
 import dotenv from 'dotenv';
 import path from 'path';
+import { config } from './config';
 import adminRoutes from './routes/admin';
 import apiRoutes from './routes/api';
 import { bot } from './bot/bot'; // Initialize bot
@@ -9,8 +10,8 @@ import { bot } from './bot/bot'; // Initialize bot
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 10000;
-const SESSION_SECRET = process.env.SESSION_SECRET || 'change-this-secret-in-production';
+const PORT = process.env.PORT || config.port || '3000';
+const SESSION_SECRET = process.env.SESSION_SECRET || config.sessionSecret || 'change-this-secret-in-production';
 
 // Middleware
 app.use(express.json());
@@ -34,13 +35,20 @@ app.use(
   })
 );
 
-// Serve static files from public directory
-app.use(express.static(path.join(__dirname, '../public')));
-
-// Root route - redirect to admin panel
+// Root route - redirect to admin panel (must be before other routes)
 app.get('/', (req, res) => {
   res.redirect('/admin');
 });
+
+// Routes - IMPORTANT: Register routes BEFORE static files
+app.use('/admin', adminRoutes);
+app.use('/api', apiRoutes);
+
+// Serve static files from public directory (handle both dev and production)
+const publicPath = require('fs').existsSync(path.join(process.cwd(), 'dist', 'public'))
+  ? path.join(process.cwd(), 'dist', 'public')
+  : path.join(process.cwd(), 'public');
+app.use(express.static(publicPath));
 
 // Webhook endpoint for Telegram bot (Render/Netlify)
 if (process.env.RENDER === 'true' || process.env.USE_WEBHOOK === 'true') {
@@ -60,19 +68,34 @@ if (process.env.RENDER === 'true' || process.env.USE_WEBHOOK === 'true') {
   });
 }
 
-// Routes
-app.use('/admin', adminRoutes);
-app.use('/api', apiRoutes);
-
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.json({ status: 'ok' });
 });
 
+// 404 handler for undefined routes
+app.use((req, res) => {
+  console.log(`404 - Route not found: ${req.method} ${req.path}`);
+  res.status(404).json({ 
+    error: 'Route not found',
+    path: req.path,
+    method: req.method
+  });
+});
+
+// Error handling middleware
+app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  console.error('Server Error:', err);
+  res.status(500).json({ error: 'Internal server error' });
+});
+
 // Start server
 app.listen(PORT, async () => {
-  console.log(`Server is running on port ${PORT}`);
-  console.log(`Admin panel: http://localhost:${PORT}/admin`);
+  console.log('='.repeat(50));
+  console.log(`✅ Server is running on port ${PORT}`);
+  console.log(`✅ Admin panel: http://localhost:${PORT}/admin`);
+  console.log(`✅ Health check: http://localhost:${PORT}/health`);
+  console.log('='.repeat(50));
   
   // Auto-setup webhook for Render
   if (process.env.RENDER === 'true' && process.env.RENDER_EXTERNAL_URL) {
@@ -81,13 +104,13 @@ app.listen(PORT, async () => {
       console.log(`Setting up webhook for Render: ${webhookUrl}`);
       await bot.setWebHook(webhookUrl);
       const webhookInfo = await bot.getWebHookInfo();
-      console.log('Webhook configured successfully!');
+      console.log('✅ Webhook configured successfully!');
       console.log('Webhook info:', JSON.stringify(webhookInfo, null, 2));
     } catch (error) {
-      console.error('Failed to setup webhook:', error);
+      console.error('❌ Failed to setup webhook:', error);
       console.error('Bot will not receive updates until webhook is configured');
     }
   } else if (process.env.RENDER === 'true') {
-    console.log('Warning: RENDER_EXTERNAL_URL not set. Webhook will not be configured automatically.');
+    console.log('⚠️  Warning: RENDER_EXTERNAL_URL not set. Webhook will not be configured automatically.');
   }
 });

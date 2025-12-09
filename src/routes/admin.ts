@@ -33,7 +33,19 @@ router.post('/logout', (req: Request, res: Response) => {
 
 // GET /admin - Serve admin panel (frontend handles auth check)
 router.get('/', (req: Request, res: Response) => {
-  res.sendFile(path.join(__dirname, '../../public/admin.html'));
+  // Handle both development and production paths
+  const adminPath = path.join(process.cwd(), 'public', 'admin.html');
+  const distAdminPath = path.join(process.cwd(), 'dist', 'public', 'admin.html');
+  
+  // Try dist first (production), then root (development)
+  const filePath = require('fs').existsSync(distAdminPath) ? distAdminPath : adminPath;
+  
+  res.sendFile(path.resolve(filePath), (err) => {
+    if (err) {
+      console.error('Error sending admin.html:', err);
+      res.status(500).send('Error loading admin panel');
+    }
+  });
 });
 
 // GET /admin/check - Check if user is authenticated

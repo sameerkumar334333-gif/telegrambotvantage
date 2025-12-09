@@ -5,6 +5,7 @@ import { config } from '../config';
 import { supabase } from '../services/supabase';
 import { uploadImageToSupabase } from '../services/storage';
 import { getUserState, setUserState, clearUserState } from '../services/user-state';
+import { logMessage } from '../services/message-logger';
 
 const token = config.telegramBotToken;
 // Video path - works in both local, Render, and Netlify environments
@@ -39,6 +40,17 @@ bot.onText(/\/start/, async (msg) => {
     return;
   }
 
+  // Log incoming command
+  await logMessage({
+    telegram_user_id: user.id,
+    telegram_username: user.username || null,
+    telegram_first_name: user.first_name || null,
+    telegram_last_name: user.last_name || null,
+    message_text: '/start',
+    direction: 'incoming',
+    message_type: 'command',
+  });
+
   // Reset user state
   clearUserState(user.id);
 
@@ -63,12 +75,35 @@ Let's get started! Drop your UID below 👇`;
       caption: welcomeMessage,
     });
 
+    // Log outgoing message
+    await logMessage({
+      telegram_user_id: user.id,
+      telegram_username: user.username || null,
+      telegram_first_name: user.first_name || null,
+      telegram_last_name: user.last_name || null,
+      message_text: welcomeMessage,
+      direction: 'outgoing',
+      message_type: 'video',
+    });
+
     // Set user state to waiting for UID
     setUserState(user.id, { step: 'waiting_for_uid' });
   } catch (error) {
     console.error('Error sending welcome video:', error);
     // Fallback to text only
     await bot.sendMessage(chatId, welcomeMessage);
+    
+    // Log outgoing message
+    await logMessage({
+      telegram_user_id: user.id,
+      telegram_username: user.username || null,
+      telegram_first_name: user.first_name || null,
+      telegram_last_name: user.last_name || null,
+      message_text: welcomeMessage,
+      direction: 'outgoing',
+      message_type: 'text',
+    });
+    
     setUserState(user.id, { step: 'waiting_for_uid' });
   }
 });
@@ -90,14 +125,34 @@ bot.on('message', async (msg) => {
   const userState = getUserState(user.id);
   const messageText = msg.text?.trim() || '';
 
+  // Log incoming message
+  await logMessage({
+    telegram_user_id: user.id,
+    telegram_username: user.username || null,
+    telegram_first_name: user.first_name || null,
+    telegram_last_name: user.last_name || null,
+    message_text: messageText,
+    direction: 'incoming',
+    message_type: 'text',
+  });
+
   // If user is waiting for UID
   if (userState?.step === 'waiting_for_uid') {
     // Validate UID (must be exactly 7 digits)
     if (!isValidUID(messageText)) {
-      await bot.sendMessage(
-        chatId,
-        '❌ Invalid UID format!\n\nPlease enter a valid 7-digit UID.'
-      );
+      const errorMsg = '❌ Invalid UID format!\n\nPlease enter a valid 7-digit UID.';
+      await bot.sendMessage(chatId, errorMsg);
+      
+      // Log outgoing message
+      await logMessage({
+        telegram_user_id: user.id,
+        telegram_username: user.username || null,
+        telegram_first_name: user.first_name || null,
+        telegram_last_name: user.last_name || null,
+        message_text: errorMsg,
+        direction: 'outgoing',
+        message_type: 'text',
+      });
       return;
     }
 
@@ -107,24 +162,54 @@ bot.on('message', async (msg) => {
       uid: messageText,
     });
 
-    await bot.sendMessage(
-      chatId,
-      '✅ UID received successfully!\n\n💰 Please deposit $50 and send the screenshot of your deposit.'
-    );
+    const successMsg = '✅ UID received successfully!\n\n💰 Please deposit $50 and send the screenshot of your deposit.';
+    await bot.sendMessage(chatId, successMsg);
+    
+    // Log outgoing message
+    await logMessage({
+      telegram_user_id: user.id,
+      telegram_username: user.username || null,
+      telegram_first_name: user.first_name || null,
+      telegram_last_name: user.last_name || null,
+      message_text: successMsg,
+      direction: 'outgoing',
+      message_type: 'text',
+    });
     return;
   }
 
   // If user is waiting for screenshot but sends text
   if (userState?.step === 'waiting_for_screenshot') {
-    await bot.sendMessage(chatId, '📸 Please send your screenshot to continue.');
+    const screenshotMsg = '📸 Please send your screenshot to continue.';
+    await bot.sendMessage(chatId, screenshotMsg);
+    
+    // Log outgoing message
+    await logMessage({
+      telegram_user_id: user.id,
+      telegram_username: user.username || null,
+      telegram_first_name: user.first_name || null,
+      telegram_last_name: user.last_name || null,
+      message_text: screenshotMsg,
+      direction: 'outgoing',
+      message_type: 'text',
+    });
     return;
   }
 
   // Default message for users not in flow
-  await bot.sendMessage(
-    chatId,
-    '👋 Hello! Please use /start to begin the verification process.'
-  );
+  const defaultMsg = '👋 Hello! Please use /start to begin the verification process.';
+  await bot.sendMessage(chatId, defaultMsg);
+  
+  // Log outgoing message
+  await logMessage({
+    telegram_user_id: user.id,
+    telegram_username: user.username || null,
+    telegram_first_name: user.first_name || null,
+    telegram_last_name: user.last_name || null,
+    message_text: defaultMsg,
+    direction: 'outgoing',
+    message_type: 'text',
+  });
 });
 
 // Handle photo messages (screenshot submission)
@@ -139,12 +224,32 @@ bot.on('photo', async (msg) => {
 
   const userState = getUserState(user.id);
 
+  // Log incoming photo
+  await logMessage({
+    telegram_user_id: user.id,
+    telegram_username: user.username || null,
+    telegram_first_name: user.first_name || null,
+    telegram_last_name: user.last_name || null,
+    message_text: '[Photo sent]',
+    direction: 'incoming',
+    message_type: 'photo',
+  });
+
   // If user hasn't provided UID yet
   if (!userState || userState.step !== 'waiting_for_screenshot' || !userState.uid) {
-    await bot.sendMessage(
-      chatId,
-      '⚠️ Please provide your UID first using /start command.'
-    );
+    const errorMsg = '⚠️ Please provide your UID first using /start command.';
+    await bot.sendMessage(chatId, errorMsg);
+    
+    // Log outgoing message
+    await logMessage({
+      telegram_user_id: user.id,
+      telegram_username: user.username || null,
+      telegram_first_name: user.first_name || null,
+      telegram_last_name: user.last_name || null,
+      message_text: errorMsg,
+      direction: 'outgoing',
+      message_type: 'text',
+    });
     return;
   }
 
@@ -152,7 +257,19 @@ bot.on('photo', async (msg) => {
     // Get the largest photo
     const photos = msg.photo;
     if (!photos || photos.length === 0) {
-      await bot.sendMessage(chatId, 'Please send a valid image (screenshot) to continue.');
+      const errorMsg = 'Please send a valid image (screenshot) to continue.';
+      await bot.sendMessage(chatId, errorMsg);
+      
+      // Log outgoing message
+      await logMessage({
+        telegram_user_id: user.id,
+        telegram_username: user.username || null,
+        telegram_first_name: user.first_name || null,
+        telegram_last_name: user.last_name || null,
+        message_text: errorMsg,
+        direction: 'outgoing',
+        message_type: 'text',
+      });
       return;
     }
 
@@ -216,19 +333,37 @@ bot.on('photo', async (msg) => {
 
     // Delete processing message and send confirmation
     await bot.deleteMessage(chatId, processingMsg.message_id);
-    await bot.sendMessage(
-      chatId,
-      '✅ Thank you! Your screenshot has been submitted successfully.\n\n⏳ We will review your submission and get back to you within 30-45 minutes.\n\nPlease wait for our response. 🙏'
-    );
+    const confirmationMsg = '✅ Thank you! Your screenshot has been submitted successfully.\n\n⏳ We will review your submission and get back to you within 30-45 minutes.\n\nPlease wait for our response. 🙏';
+    await bot.sendMessage(chatId, confirmationMsg);
+    
+    // Log outgoing message
+    await logMessage({
+      telegram_user_id: user.id,
+      telegram_username: user.username || null,
+      telegram_first_name: user.first_name || null,
+      telegram_last_name: user.last_name || null,
+      message_text: confirmationMsg,
+      direction: 'outgoing',
+      message_type: 'text',
+    });
 
     // Clear user state (flow completed)
     clearUserState(user.id);
   } catch (error) {
     console.error('Error handling photo:', error);
-    await bot.sendMessage(
-      chatId,
-      '❌ Sorry, there was an error processing your screenshot. Please try again later.'
-    );
+    const errorMsg = '❌ Sorry, there was an error processing your screenshot. Please try again later.';
+    await bot.sendMessage(chatId, errorMsg);
+    
+    // Log outgoing message
+    await logMessage({
+      telegram_user_id: user.id,
+      telegram_username: user.username || null,
+      telegram_first_name: user.first_name || null,
+      telegram_last_name: user.last_name || null,
+      message_text: errorMsg,
+      direction: 'outgoing',
+      message_type: 'text',
+    });
   }
 });
 
@@ -245,19 +380,51 @@ bot.on('document', async (msg) => {
 
   const userState = getUserState(user.id);
 
+  // Log incoming document
+  await logMessage({
+    telegram_user_id: user.id,
+    telegram_username: user.username || null,
+    telegram_first_name: user.first_name || null,
+    telegram_last_name: user.last_name || null,
+    message_text: `[Document sent: ${document.file_name || 'unknown'}]`,
+    direction: 'incoming',
+    message_type: 'document',
+  });
+
   // If user hasn't provided UID yet
   if (!userState || userState.step !== 'waiting_for_screenshot' || !userState.uid) {
-    await bot.sendMessage(
-      chatId,
-      '⚠️ Please provide your UID first using /start command.'
-    );
+    const errorMsg = '⚠️ Please provide your UID first using /start command.';
+    await bot.sendMessage(chatId, errorMsg);
+    
+    // Log outgoing message
+    await logMessage({
+      telegram_user_id: user.id,
+      telegram_username: user.username || null,
+      telegram_first_name: user.first_name || null,
+      telegram_last_name: user.last_name || null,
+      message_text: errorMsg,
+      direction: 'outgoing',
+      message_type: 'text',
+    });
     return;
   }
 
   // Check if it's an image file
   const mimeType = document.mime_type || '';
   if (!mimeType.startsWith('image/')) {
-    await bot.sendMessage(chatId, '📸 Please send an image (screenshot) to continue.');
+    const errorMsg = '📸 Please send an image (screenshot) to continue.';
+    await bot.sendMessage(chatId, errorMsg);
+    
+    // Log outgoing message
+    await logMessage({
+      telegram_user_id: user.id,
+      telegram_username: user.username || null,
+      telegram_first_name: user.first_name || null,
+      telegram_last_name: user.last_name || null,
+      message_text: errorMsg,
+      direction: 'outgoing',
+      message_type: 'text',
+    });
     return;
   }
 
@@ -319,23 +486,52 @@ bot.on('document', async (msg) => {
 
     // Delete processing message and send confirmation
     await bot.deleteMessage(chatId, processingMsg.message_id);
-    await bot.sendMessage(
-      chatId,
-      '✅ Thank you! Your screenshot has been submitted successfully.\n\n⏳ We will review your submission and get back to you within 30-45 minutes.\n\nPlease wait for our response. 🙏'
-    );
+    const confirmationMsg = '✅ Thank you! Your screenshot has been submitted successfully.\n\n⏳ We will review your submission and get back to you within 30-45 minutes.\n\nPlease wait for our response. 🙏';
+    await bot.sendMessage(chatId, confirmationMsg);
+    
+    // Log outgoing message
+    await logMessage({
+      telegram_user_id: user.id,
+      telegram_username: user.username || null,
+      telegram_first_name: user.first_name || null,
+      telegram_last_name: user.last_name || null,
+      message_text: confirmationMsg,
+      direction: 'outgoing',
+      message_type: 'text',
+    });
 
     // Clear user state (flow completed)
     clearUserState(user.id);
   } catch (error) {
     console.error('Error handling document:', error);
-    await bot.sendMessage(
-      chatId,
-      '❌ Sorry, there was an error processing your screenshot. Please try again later.'
-    );
+    const errorMsg = '❌ Sorry, there was an error processing your screenshot. Please try again later.';
+    await bot.sendMessage(chatId, errorMsg);
+    
+    // Log outgoing message
+    await logMessage({
+      telegram_user_id: user.id,
+      telegram_username: user.username || null,
+      telegram_first_name: user.first_name || null,
+      telegram_last_name: user.last_name || null,
+      message_text: errorMsg,
+      direction: 'outgoing',
+      message_type: 'text',
+    });
   }
 });
 
 // Only log when using polling mode
 if (!useWebhook) {
-  console.log('Telegram bot is running in polling mode...');
+  console.log('✅ Telegram bot is running in polling mode...');
+  console.log(`✅ Bot token: ${token.substring(0, 10)}...${token.substring(token.length - 5)}`);
 }
+
+// Error handler for bot
+bot.on('error', (error) => {
+  console.error('❌ Telegram Bot Error:', error.message || error);
+});
+
+bot.on('polling_error', (error) => {
+  console.error('❌ Telegram Bot Polling Error:', error.message || error);
+  // Don't crash - bot will retry automatically
+});

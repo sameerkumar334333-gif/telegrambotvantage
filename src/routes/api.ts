@@ -3,6 +3,7 @@ import { supabase } from '../services/supabase';
 import { requireAuth } from '../middleware/auth';
 import { UpdateSubmissionRequest } from '../types';
 import { sendVerificationMessage, sendRejectionMessage, sendCustomMessage } from '../services/bot-messaging';
+import { getMessageStatistics } from '../services/message-logger';
 
 const router = Router();
 
@@ -161,6 +162,144 @@ router.post('/submissions/:id/send-message', async (req: Request, res: Response)
   } catch (error) {
     console.error('Error in POST /api/submissions/:id/send-message:', error);
     res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// GET /api/messages/statistics - Get message statistics
+router.get('/messages/statistics', async (req: Request, res: Response) => {
+  try {
+    const statistics = await getMessageStatistics();
+    res.json(statistics);
+  } catch (error) {
+    console.error('Error in GET /api/messages/statistics:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// GET /api/messages - Get all messages with optional filters
+router.get('/messages', async (req: Request, res: Response) => {
+  try {
+    const { telegram_user_id, direction, limit = '100' } = req.query;
+
+    let query = supabase
+      .from('messages')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(parseInt(limit as string, 10));
+
+    // Filter by user ID if provided
+    if (telegram_user_id && typeof telegram_user_id === 'string') {
+      const userId = parseInt(telegram_user_id, 10);
+      if (!isNaN(userId)) {
+        query = query.eq('telegram_user_id', userId);
+      }
+    }
+
+    // Filter by direction if provided
+    if (direction && typeof direction === 'string' && (direction === 'incoming' || direction === 'outgoing')) {
+      query = query.eq('direction', direction);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      // Check if table doesn't exist
+      if (error.code === 'PGRST205' || error.message?.includes('Could not find the table')) {
+        console.error('❌ Messages table does not exist in database!');
+        console.error('📝 Please run the SQL from create-messages-table.sql in your Supabase SQL Editor');
+        res.status(503).json({ 
+          error: 'Messages table not found',
+          message: 'Please create the messages table in Supabase. See create-messages-table.sql file.',
+          hint: 'Run the SQL script in Supabase SQL Editor'
+        });
+        return;
+      }
+      
+      console.error('Error fetching messages:', error);
+      res.status(500).json({ error: 'Failed to fetch messages', details: error.message });
+      return;
+    }
+
+    res.json({ messages: data || [] });
+  } catch (error) {
+    console.error('Error in GET /api/messages:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// POST /api/messages/send - Send message directly to user by telegram_user_id
+router.post('/messages/send', async (req: Request, res: Response) => {
+  try {
+    const { telegram_user_id, message } = req.body;
+
+    if (!telegram_user_id || !message || typeof message !== 'string' || message.trim().length === 0) {
+      res.status(400).json({ error: 'telegram_user_id and message are required' });
+      return;
+    }
+
+    const userId = parseInt(telegram_user_id.toString(), 10);
+    if (isNaN(userId)) {
+      res.status(400).json({ error: 'Invalid telegram_user_id' });
+      return;
+    }
+
+    // Send message
+    const success = await sendCustomMessage(userId, message.trim());
+
+    if (success) {
+      res.json({ success: true, message: 'Message sent successfully' });
+    } else {
+      res.status(500).json({ error: 'Failed to send message' });
+    }
+  } catch (error) {
+    console.error('Error in POST /api/messages/send:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// GET /api/messages/users - Get list of unique users who have messaged
+router.get('/messages/users', async (req: Request, res: Response) => {
+  try {
+    const { data, error } = await supabase
+      .from('messages')
+      .select('telegram_user_id, telegram_username, telegram_first_name, telegram_last_name')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      // Check if table doesn't exist
+      if (error.code === 'PGRST205' || error.message?.includes('Could not find the table')) {
+        console.error('❌ Messages table does not exist in database!');
+        console.error('📝 Please run the SQL from create-messages-table.sql in your Supabase SQL Editor');
+        res.status(503).json({ 
+          error: 'Messages table not found',
+          message: 'Please create the messages table in Supabase. See create-messages-table.sql file.',
+          hint: 'Run the SQL script in Supabase SQL Editor'
+        });
+        return;
+      }
+      
+      console.error('Error fetching users:', error);
+      res.status(500).json({ error: 'Failed to fetch users', details: error.message });
+      return;
+    }
+
+    // Get unique users
+    const uniqueUsers = new Map();
+    data?.forEach((msg) => {
+      if (!uniqueUsers.has(msg.telegram_user_id)) {
+        uniqueUsers.set(msg.telegram_user_id, {
+          telegram_user_id: msg.telegram_user_id,
+          telegram_username: msg.telegram_username,
+          telegram_first_name: msg.telegram_first_name,
+          telegram_last_name: msg.telegram_last_name,
+        });
+      }
+    });
+
+    res.json({ users: Array.from(uniqueUsers.values()) });
+  } catch (error: any) {
+    console.error('Error in GET /api/messages/users:', error);
+    res.status(500).json({ error: 'Internal server error', details: error?.message });
   }
 });
 
