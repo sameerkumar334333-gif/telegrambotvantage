@@ -3,7 +3,6 @@ import path from 'path';
 import fs from 'fs';
 import { config } from '../config';
 import { supabase } from '../services/supabase';
-import { uploadImageToSupabase } from '../services/storage';
 import { getUserState, setUserState, clearUserState } from '../services/user-state';
 
 const token = config.telegramBotToken;
@@ -44,17 +43,11 @@ bot.onText(/\/start/, async (msg) => {
 
   const welcomeMessage = `👋 Hello Trader!
 
-To get VIP access to the Wolf of Forex VIP Community, please follow these instructions:
+Just Register and Send UID here and You'll be added in VIP channel!
 
 📋 Instructions:
 1. Register on the Vantage platform: ${VANTAGE_LINK}
-2. Drop your UID (7 digits)
-3. Deposit $50
-4. Send screenshot of your deposit.
-
-
-
-Let's get started! Drop your UID below 👇`;
+2. Drop your UID (7 digits) below 👇`;
 
   try {
     // Try dist folder first (production), then root (development)
@@ -101,22 +94,65 @@ bot.on('message', async (msg) => {
       return;
     }
 
-    // UID is valid, save it and ask for screenshot
-    setUserState(user.id, {
-      step: 'waiting_for_screenshot',
-      uid: messageText,
-    });
+    // UID is valid, save it directly to database
+    try {
+      // Show processing message
+      const processingMsg = await bot.sendMessage(chatId, '⏳ Processing your UID...');
 
-    await bot.sendMessage(
-      chatId,
-      '✅ UID received successfully!\n\n💰 Please deposit $50 and send the screenshot of your deposit.'
-    );
-    return;
-  }
+      // Create submission in database (without image)
+      const submissionData: any = {
+        telegram_user_id: user.id,
+        telegram_username: user.username || null,
+        telegram_first_name: user.first_name || '',
+        telegram_last_name: user.last_name || null,
+        image_url: '', // Empty string as placeholder (no screenshot required)
+        status: 'Pending',
+        notes: '',
+        user_uid: messageText,
+      };
 
-  // If user is waiting for screenshot but sends text
-  if (userState?.step === 'waiting_for_screenshot') {
-    await bot.sendMessage(chatId, '📸 Please send your screenshot to continue.');
+      const { data, error } = await supabase
+        .from('submissions')
+        .insert(submissionData)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error saving submission:', error);
+        console.error('Error details:', JSON.stringify(error, null, 2));
+        await bot.deleteMessage(chatId, processingMsg.message_id);
+        
+        // Check if it's a database column error
+        if (error.message?.includes('user_uid') || error.code === '42703') {
+          await bot.sendMessage(
+            chatId,
+            '❌ Database configuration error. Please contact admin.\n\nError: Missing user_uid column in database.'
+          );
+        } else {
+          await bot.sendMessage(
+            chatId,
+            '❌ Sorry, there was an error processing your UID. Please try again later.\n\nIf the problem persists, please contact support.'
+          );
+        }
+        return;
+      }
+
+      // Delete processing message and send confirmation
+      await bot.deleteMessage(chatId, processingMsg.message_id);
+      await bot.sendMessage(
+        chatId,
+        '✅ Thank you! Your UID has been submitted successfully.\n\n⏳ We\'ll review and You will receive the VIP Channel Join Link.\n\nPlease wait for our response. 🙏'
+      );
+
+      // Clear user state (flow completed)
+      clearUserState(user.id);
+    } catch (error) {
+      console.error('Error handling UID submission:', error);
+      await bot.sendMessage(
+        chatId,
+        '❌ Sorry, there was an error processing your UID. Please try again later.'
+      );
+    }
     return;
   }
 
@@ -127,7 +163,7 @@ bot.on('message', async (msg) => {
   );
 });
 
-// Handle photo messages (screenshot submission)
+// Handle photo messages (optional - screenshot not required anymore)
 bot.on('photo', async (msg) => {
   const chatId = msg.chat.id;
   const user = msg.from;
@@ -137,202 +173,29 @@ bot.on('photo', async (msg) => {
     return;
   }
 
-  const userState = getUserState(user.id);
+  // Screenshot is no longer required, just inform user
+  await bot.sendMessage(
+    chatId,
+    '📸 Screenshot is not required. Just send your UID (7 digits) using /start command.'
+  );
 
-  // If user hasn't provided UID yet
-  if (!userState || userState.step !== 'waiting_for_screenshot' || !userState.uid) {
-    await bot.sendMessage(
-      chatId,
-      '⚠️ Please provide your UID first using /start command.'
-    );
-    return;
-  }
-
-  try {
-    // Get the largest photo
-    const photos = msg.photo;
-    if (!photos || photos.length === 0) {
-      await bot.sendMessage(chatId, 'Please send a valid image (screenshot) to continue.');
-      return;
-    }
-
-    const largestPhoto = photos[photos.length - 1];
-    const fileId = largestPhoto.file_id;
-
-    // Get file info and download URL
-    const file = await bot.getFile(fileId);
-    const fileUrl = `https://api.telegram.org/file/bot${token}/${file.file_path}`;
-
-    // Determine file extension
-    const fileExtension = file.file_path?.split('.').pop() || 'jpg';
-
-    // Show processing message
-    const processingMsg = await bot.sendMessage(chatId, '⏳ Processing your screenshot...');
-
-    // Upload to Supabase Storage
-    const { imageUrl } = await uploadImageToSupabase(fileUrl, fileExtension);
-
-    // Create submission in database
-    const submissionData: any = {
-      telegram_user_id: user.id,
-      telegram_username: user.username || null,
-      telegram_first_name: user.first_name || '',
-      telegram_last_name: user.last_name || null,
-      image_url: imageUrl,
-      status: 'Pending',
-      notes: '',
-    };
-
-    // Only add user_uid if column exists (graceful fallback)
-    if (userState.uid) {
-      submissionData.user_uid = userState.uid;
-    }
-
-    const { data, error } = await supabase
-      .from('submissions')
-      .insert(submissionData)
-      .select()
-      .single();
-
-    if (error) {
-      console.error('Error saving submission:', error);
-      console.error('Error details:', JSON.stringify(error, null, 2));
-      await bot.deleteMessage(chatId, processingMsg.message_id);
-      
-      // Check if it's a database column error
-      if (error.message?.includes('user_uid') || error.code === '42703') {
-        await bot.sendMessage(
-          chatId,
-          '❌ Database configuration error. Please contact admin.\n\nError: Missing user_uid column in database.'
-        );
-      } else {
-        await bot.sendMessage(
-          chatId,
-          '❌ Sorry, there was an error processing your submission. Please try again later.\n\nIf the problem persists, please contact support.'
-        );
-      }
-      return;
-    }
-
-    // Delete processing message and send confirmation
-    await bot.deleteMessage(chatId, processingMsg.message_id);
-    await bot.sendMessage(
-      chatId,
-      '✅ Thank you! Your screenshot has been submitted successfully.\n\n⏳ We will review your submission and get back to you within 30-45 minutes.\n\nPlease wait for our response. 🙏'
-    );
-
-    // Clear user state (flow completed)
-    clearUserState(user.id);
-  } catch (error) {
-    console.error('Error handling photo:', error);
-    await bot.sendMessage(
-      chatId,
-      '❌ Sorry, there was an error processing your screenshot. Please try again later.'
-    );
-  }
 });
 
-// Handle document messages (in case user sends image as file)
+// Handle document messages (optional - screenshot not required anymore)
 bot.on('document', async (msg) => {
   const chatId = msg.chat.id;
   const user = msg.from;
-  const document = msg.document;
 
-  if (!user || !document) {
-    await bot.sendMessage(chatId, 'Please send a valid image (screenshot) to continue.');
+  if (!user) {
+    await bot.sendMessage(chatId, 'Unable to retrieve user information.');
     return;
   }
 
-  const userState = getUserState(user.id);
-
-  // If user hasn't provided UID yet
-  if (!userState || userState.step !== 'waiting_for_screenshot' || !userState.uid) {
-    await bot.sendMessage(
-      chatId,
-      '⚠️ Please provide your UID first using /start command.'
-    );
-    return;
-  }
-
-  // Check if it's an image file
-  const mimeType = document.mime_type || '';
-  if (!mimeType.startsWith('image/')) {
-    await bot.sendMessage(chatId, '📸 Please send an image (screenshot) to continue.');
-    return;
-  }
-
-  try {
-    // Get file info and download URL
-    const file = await bot.getFile(document.file_id);
-    const fileUrl = `https://api.telegram.org/file/bot${token}/${file.file_path}`;
-
-    // Determine file extension
-    const fileExtension = document.file_name?.split('.').pop() || mimeType.split('/')[1] || 'jpg';
-
-    // Show processing message
-    const processingMsg = await bot.sendMessage(chatId, '⏳ Processing your screenshot...');
-
-    // Upload to Supabase Storage
-    const { imageUrl } = await uploadImageToSupabase(fileUrl, fileExtension);
-
-    // Create submission in database
-    const submissionData: any = {
-      telegram_user_id: user.id,
-      telegram_username: user.username || null,
-      telegram_first_name: user.first_name || '',
-      telegram_last_name: user.last_name || null,
-      image_url: imageUrl,
-      status: 'Pending',
-      notes: '',
-    };
-
-    // Only add user_uid if column exists (graceful fallback)
-    if (userState.uid) {
-      submissionData.user_uid = userState.uid;
-    }
-
-    const { data, error } = await supabase
-      .from('submissions')
-      .insert(submissionData)
-      .select()
-      .single();
-
-    if (error) {
-      console.error('Error saving submission:', error);
-      console.error('Error details:', JSON.stringify(error, null, 2));
-      await bot.deleteMessage(chatId, processingMsg.message_id);
-      
-      // Check if it's a database column error
-      if (error.message?.includes('user_uid') || error.code === '42703') {
-        await bot.sendMessage(
-          chatId,
-          '❌ Database configuration error. Please contact admin.\n\nError: Missing user_uid column in database.'
-        );
-      } else {
-        await bot.sendMessage(
-          chatId,
-          '❌ Sorry, there was an error processing your submission. Please try again later.\n\nIf the problem persists, please contact support.'
-        );
-      }
-      return;
-    }
-
-    // Delete processing message and send confirmation
-    await bot.deleteMessage(chatId, processingMsg.message_id);
-    await bot.sendMessage(
-      chatId,
-      '✅ Thank you! Your screenshot has been submitted successfully.\n\n⏳ We will review your submission and get back to you within 30-45 minutes.\n\nPlease wait for our response. 🙏'
-    );
-
-    // Clear user state (flow completed)
-    clearUserState(user.id);
-  } catch (error) {
-    console.error('Error handling document:', error);
-    await bot.sendMessage(
-      chatId,
-      '❌ Sorry, there was an error processing your screenshot. Please try again later.'
-    );
-  }
+  // Screenshot is no longer required, just inform user
+  await bot.sendMessage(
+    chatId,
+    '📸 Screenshot is not required. Just send your UID (7 digits) using /start command.'
+  );
 });
 
 // Only log when using polling mode

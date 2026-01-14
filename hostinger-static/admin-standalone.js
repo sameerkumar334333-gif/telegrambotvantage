@@ -197,10 +197,12 @@ function renderSubmissions(submissions) {
             <td>${submission.telegram_username || 'N/A'}</td>
             <td>${name || 'N/A'}</td>
             <td>
-                <img src="${submission.image_url}" 
-                     alt="Screenshot" 
-                     class="screenshot-thumb"
-                     onclick="window.open('${submission.image_url}', '_blank')">
+                ${submission.image_url && submission.image_url.trim() !== '' 
+                    ? `<img src="${submission.image_url}" 
+                         alt="Screenshot" 
+                         class="screenshot-thumb"
+                         onclick="window.open('${submission.image_url}', '_blank')">`
+                    : '<span style="color: #999;">No screenshot</span>'}
             </td>
             <td>
                 <div class="status-control">

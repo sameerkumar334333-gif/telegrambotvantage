@@ -2,7 +2,7 @@
 // In production, you might want to use Redis or database for this
 
 interface UserState {
-  step: 'waiting_for_uid' | 'waiting_for_screenshot' | 'completed';
+  step: 'waiting_for_uid' | 'completed';
   uid?: string;
 }
 
