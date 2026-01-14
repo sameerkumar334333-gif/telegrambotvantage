@@ -12,7 +12,12 @@ Happy Trading! 🚀`;
 
 const REJECTION_MESSAGE = `❌ Your submission has been rejected.
 
-Please deposit $50 and resubmit your screenshot for verification.
+Please register using this link:
+https://vigco.co/la-com/m8fVIcJJ
+
+Then resubmit your UID:
+1) Send /start
+2) Send your 7-digit UID again
 
 If you have any questions or need assistance, please contact our team:
 👥 Contact Team: @teamwof
