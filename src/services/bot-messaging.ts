@@ -6,7 +6,7 @@ const VERIFICATION_MESSAGE = `🎉 Congratulations! You're Verified!
 
 Welcome to the VIP Wolf of Forex Community! Join our exclusive trading channel and start making money with us.
 
-🔗 Join VIP Channel: https://t.me/+K3Qy0ILna8U5MTg1
+🔗 Join VIP Channel: https://t.me/+BjKRysigL8plNWFl
 
 Happy Trading! 🚀`;
 
