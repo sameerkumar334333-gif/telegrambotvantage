@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS submissions (
   telegram_username TEXT,
   telegram_first_name TEXT NOT NULL,
   telegram_last_name TEXT,
+  user_uid TEXT,
   image_url TEXT NOT NULL,
   status TEXT NOT NULL DEFAULT 'Pending' CHECK (status IN ('Pending', 'Approved', 'Rejected')),
   notes TEXT DEFAULT '',

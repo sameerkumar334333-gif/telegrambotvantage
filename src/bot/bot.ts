@@ -175,11 +175,17 @@ bot.on('message', async (msg) => {
       if (error) {
         console.error('Error saving submission:', error);
         console.error('Error details:', JSON.stringify(error, null, 2));
+        console.error('Error code:', error.code);
+        console.error('Error message:', error.message);
+        console.error('Error hint:', error.hint);
         await bot.deleteMessage(chatId, processingMsg.message_id);
         
         // Check if it's a database column error
-        if (error.message?.includes('user_uid') || error.code === '42703') {
-          const errorMsg = '❌ Database configuration error. Please contact admin.\n\nError: Missing user_uid column in database.';
+        if (error.message?.includes('user_uid') || 
+            error.code === '42703' || 
+            error.message?.includes('column "user_uid" does not exist') ||
+            error.message?.includes('column user_uid does not exist')) {
+          const errorMsg = '❌ Database configuration error.\n\nMissing user_uid column in database.\n\nPlease run the SQL from add-user-uid-column.sql in your Supabase SQL Editor.';
           await bot.sendMessage(chatId, errorMsg);
           
           // Log outgoing message
@@ -193,7 +199,10 @@ bot.on('message', async (msg) => {
             message_type: 'text',
           });
         } else {
-          const errorMsg = '❌ Sorry, there was an error processing your UID. Please try again later.\n\nIf the problem persists, please contact support.';
+          // Show more detailed error for debugging
+          const errorDetails = error.message || error.hint || 'Unknown error';
+          console.error('Full error:', errorDetails);
+          const errorMsg = `❌ Sorry, there was an error processing your UID.\n\nError: ${errorDetails}\n\nPlease try again later or contact support.`;
           await bot.sendMessage(chatId, errorMsg);
           
           // Log outgoing message
