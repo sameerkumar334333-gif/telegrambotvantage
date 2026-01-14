@@ -1,17 +1,10 @@
 import TelegramBot from 'node-telegram-bot-api';
-import path from 'path';
-import fs from 'fs';
 import { config } from '../config';
 import { supabase } from '../services/supabase';
 import { getUserState, setUserState, clearUserState } from '../services/user-state';
 import { logMessage } from '../services/message-logger';
 
 const token = config.telegramBotToken;
-// Video path - works in both local, Render, and Netlify environments
-// Try dist folder first (production build), then root (development)
-const distVideoPath = path.join(process.cwd(), 'dist', 'tgbot.mp4');
-const rootVideoPath = path.join(process.cwd(), 'tgbot.mp4');
-const WELCOME_VIDEO_PATH = fs.existsSync(distVideoPath) ? distVideoPath : rootVideoPath;
 const VANTAGE_LINK = 'https://vigco.co/la-com/m8fVIcJJ';
 
 if (!token) {
@@ -61,44 +54,22 @@ Just Register and Send UID here and You'll be added in VIP channel!
 1. Register on the Vantage platform: ${VANTAGE_LINK}
 2. Drop your UID (7 digits) below 👇`;
 
-  try {
-    // Try dist folder first (production), then root (development)
-    const videoPath = WELCOME_VIDEO_PATH;
-    await bot.sendVideo(chatId, videoPath, {
-      caption: welcomeMessage,
-    });
+  // Send text-only welcome message (video removed)
+  await bot.sendMessage(chatId, welcomeMessage);
 
-    // Log outgoing message
-    await logMessage({
-      telegram_user_id: user.id,
-      telegram_username: user.username || null,
-      telegram_first_name: user.first_name || null,
-      telegram_last_name: user.last_name || null,
-      message_text: welcomeMessage,
-      direction: 'outgoing',
-      message_type: 'video',
-    });
+  // Log outgoing message
+  await logMessage({
+    telegram_user_id: user.id,
+    telegram_username: user.username || null,
+    telegram_first_name: user.first_name || null,
+    telegram_last_name: user.last_name || null,
+    message_text: welcomeMessage,
+    direction: 'outgoing',
+    message_type: 'text',
+  });
 
-    // Set user state to waiting for UID
-    setUserState(user.id, { step: 'waiting_for_uid' });
-  } catch (error) {
-    console.error('Error sending welcome video:', error);
-    // Fallback to text only
-    await bot.sendMessage(chatId, welcomeMessage);
-    
-    // Log outgoing message
-    await logMessage({
-      telegram_user_id: user.id,
-      telegram_username: user.username || null,
-      telegram_first_name: user.first_name || null,
-      telegram_last_name: user.last_name || null,
-      message_text: welcomeMessage,
-      direction: 'outgoing',
-      message_type: 'text',
-    });
-    
-    setUserState(user.id, { step: 'waiting_for_uid' });
-  }
+  // Set user state to waiting for UID
+  setUserState(user.id, { step: 'waiting_for_uid' });
 });
 
 // Handle text messages (UID input)
